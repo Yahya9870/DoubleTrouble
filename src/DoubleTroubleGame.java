@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import javax.swing.*;
 import java.util.Random;
 
@@ -11,28 +12,34 @@ public class DoubleTroubleGame extends JFrame {
 
     public DoubleTroubleGame() {
         super("Double Trouble");
-        setLayout(new GridLayout(2, 1));
+        setLayout(new BorderLayout());
         JPanel gamePanel = new JPanel();
-        gamePanel.setLayout(new FlowLayout());
+        gamePanel.setLayout(new GridLayout(1, 3));
 
-        buttons[0] = new JButton("Green: 3");
-        buttons[1] = new JButton("Yellow: 7");
-        buttons[2] = new JButton("Orange: 5");
-
-        for (int i = 0; i < 3; i++) {
-            int color = i;
-            buttons[i].addActionListener(e -> playerMove(color));
+        for (int i = 0; i < buttons.length; i++) {
+            buttons[i] = new JButton(getButtonText(i));
+            Color color = getColor(i);
+            buttons[i].setBackground(color);
+            buttons[i].setForeground(getContrastingColor(color));
+            buttons[i].setOpaque(true);
+            buttons[i].setBorderPainted(false);
+            int finalI = i;
+            buttons[i].addActionListener(e -> playerMove(finalI));
             gamePanel.add(buttons[i]);
         }
 
-        add(statusLabel);
-        add(gamePanel);
+        add(statusLabel, BorderLayout.NORTH);
+        add(gamePanel, BorderLayout.CENTER);
+        statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-        setSize(400, 200);
+        setSize(500, 200);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setVisible(true);
 
-        // Choose Starter Dialog
+        chooseStarter();
+    }
+
+    private void chooseStarter() {
         Object[] options = {"Player", "Computer"};
         int n = JOptionPane.showOptionDialog(this, "Who goes first?",
                 "Choose Starter", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
@@ -42,74 +49,84 @@ public class DoubleTroubleGame extends JFrame {
             computerMove();
         }
     }
+    private boolean isGameOver() {
+        return greenMarkers == 0 && yellowMarkers == 0 && orangeMarkers == 0;
+    }
+
 
     private void playerMove(int color) {
-        if (!playerTurn) return;
-
-        String input = JOptionPane.showInputDialog(this, "Enter number of markers to remove:");
-        try {
-            int num = Integer.parseInt(input);
-            if (makeMove(color, num)) {
-                playerTurn = false;
-                updateButtons();
-                if (!isGameOver()) computerMove();
-            } else {
-                JOptionPane.showMessageDialog(this, "Invalid move, try again.");
+        if (playerTurn) {
+            String input = JOptionPane.showInputDialog("Enter number of markers to remove:");
+            try {
+                int num = Integer.parseInt(input);
+                if (num > 0 && makeMove(color, num)) {
+                    updateStatus();
+                    if (isGameOver()) {
+                        JOptionPane.showMessageDialog(this, "You win!");
+                    } else {
+                        playerTurn = false;
+                        computerMove();
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this, "Invalid number of markers.");
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Please enter a valid number.");
             }
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid number.");
         }
     }
 
     private void computerMove() {
-        // Dummy implementation - Replace with strategy logic
         SwingUtilities.invokeLater(() -> {
-            int color = random.nextInt(3);
-            int markersCount = getMarkerCount(color);
-
-            // Ensure we do not attempt to make a move if there are no markers left of this color
-            if (markersCount > 0) {
-                int num = 1 + random.nextInt(markersCount);
-                makeMove(color, num);
-            } else {
-                // This branch tries another color if the initially chosen one has no markers left.
-                // It's a simple way to avoid the exception but consider implementing a smarter strategy for choosing the color and number of markers.
-                for (int i = 0; i < 3; i++) {
-                    if (getMarkerCount(i) > 0) {
-                        color = i;
-                        break; // Found a color with markers left, exit the loop.
-                    }
-                }
-                int num = 1 + random.nextInt(getMarkerCount(color)); // Now, this should be safe
-                makeMove(color, num);
+            if (isGameOver()) {
+                JOptionPane.showMessageDialog(this, "Game Over. You win!");
+                return;
             }
 
-            updateButtons();
-            playerTurn = true;
-            statusLabel.setText("Your turn. Choose a color to remove markers from.");
-            if (isGameOver()) {
-                JOptionPane.showMessageDialog(this, "Computer wins!");
+            // Simplified strategy for demonstration purposes
+            int color = -1;
+            int maxMarkers = 0;
+            // Choose the color with the most markers to try and leave more options open
+            for (int i = 0; i < 3; i++) {
+                int count = getMarkerCount(i);
+                if (count > maxMarkers) {
+                    maxMarkers = count;
+                    color = i;
+                }
+            }
+
+            // If no color has been chosen (i.e., all markers are 0, which shouldn't happen here because we check gameOver before),
+            // or as a fallback if somehow all counts were 0, just randomly pick a color with available markers
+            if (color == -1) {
+                do {
+                    color = random.nextInt(3);
+                } while (getMarkerCount(color) == 0);
+            }
+
+            int markersToRemove = 1 + random.nextInt(getMarkerCount(color)); // Always remove at least one marker
+
+            // Making the move
+            if (makeMove(color, markersToRemove)) {
+                updateButtons();
+                playerTurn = true;
+                updateStatus();
+                if (isGameOver()) {
+                    JOptionPane.showMessageDialog(this, "Computer wins. Try again!");
+                }
+            } else {
+                // This else block should never be reached because we check for game over
+                // and valid moves. It's here as a safeguard.
+                JOptionPane.showMessageDialog(this, "An error occurred in computer's move.");
             }
         });
     }
 
 
-    private boolean makeMove(int color, int num) {
-        switch (color) {
-            case 0: if (num <= greenMarkers && num > 0) { greenMarkers -= num; return true; } break;
-            case 1: if (num <= yellowMarkers && num > 0) { yellowMarkers -= num; return true; } break;
-            case 2: if (num <= orangeMarkers && num > 0) { orangeMarkers -= num; return true; } break;
-        }
-        return false;
-    }
-
-    private int getMarkerCount(int color) {
-        switch (color) {
-            case 0: return greenMarkers;
-            case 1: return yellowMarkers;
-            case 2: return orangeMarkers;
-        }
-        return 0; // Should never happen
+    private int calculateBestMove(int color) {
+        // This is a simplified logic for computer's move.
+        // Ideally, this method should contain the logic to calculate the best move.
+        int markers = getMarkerCount(color);
+        return markers > 0 ? 1 : 0; // Dummy logic: remove one marker if possible
     }
 
     private void updateButtons() {
@@ -117,16 +134,74 @@ public class DoubleTroubleGame extends JFrame {
         buttons[1].setText("Yellow: " + yellowMarkers);
         buttons[2].setText("Orange: " + orangeMarkers);
 
+        // Additional logic to handle the game over state could also go here
         if (isGameOver()) {
-            statusLabel.setText("Game Over. You win!");
+            statusLabel.setText("Game Over.");
             for (JButton button : buttons) {
-                button.setEnabled(false);
+                button.setEnabled(false); // Disable buttons when the game is over
+            }
+            if(playerTurn){
+                JOptionPane.showMessageDialog(this, "Congratulations, you win!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Computer wins. Try again!");
             }
         }
     }
 
-    private boolean isGameOver() {
-        return greenMarkers == 0 && yellowMarkers == 0 && orangeMarkers == 0;
+
+    private boolean makeMove(int color, int num) {
+        switch (color) {
+            case 0: if (num <= greenMarkers && num > 0) { greenMarkers -= num; return true; }
+            case 1: if (num <= yellowMarkers && num > 0) { yellowMarkers -= num; return true; }
+            case 2: if (num <= orangeMarkers && num > 0) { orangeMarkers -= num; return true; }
+        }
+        return false;
+    }
+
+    private void updateStatus() {
+        for (int i = 0; i < buttons.length; i++) {
+            buttons[i].setText(getButtonText(i));
+        }
+        if (isGameOver()) {
+            for (JButton button : buttons) {
+                button.setEnabled(false);
+            }
+            statusLabel.setText("Game Over.");
+        } else {
+            statusLabel.setText(playerTurn ? "Your move." : "Computer's move.");
+        }
+    }
+
+    private int getMarkerCount(int color) {
+        return switch (color) {
+            case 0 -> greenMarkers;
+            case 1 -> yellowMarkers;
+            case 2 -> orangeMarkers;
+            default -> 0;
+        };
+    }
+
+    private String getButtonText(int color) {
+        return switch (color) {
+            case 0 -> "Green: " + greenMarkers;
+            case 1 -> "Yellow: " + yellowMarkers;
+            case 2 -> "Orange: " + orangeMarkers;
+            default -> "";
+        };
+    }
+
+    private Color getColor(int color) {
+        return switch (color) {
+            case 0 -> Color.GREEN;
+            case 1 -> Color.YELLOW;
+            case 2 -> Color.ORANGE;
+            default -> Color.BLACK;
+        };
+    }
+
+    private Color getContrastingColor(Color color) {
+        double luminance = (0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue()) / 255;
+        return luminance > 0.5 ? Color.BLACK : Color.WHITE;
     }
 
     public static void main(String[] args) {
